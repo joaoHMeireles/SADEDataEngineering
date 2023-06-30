@@ -2,7 +2,7 @@ from flask import Flask, json, render_template, request, session
 import mysql.connector
 import json
 import pandas as pd
-from utils import transformarBancoToDataFrame, transformarDataFrameToVetorizada, adicionarNovaLinha
+from utils import transformarBancoToDataFrame, transformarDataFrameToVetorizada, checarSimilaridade
 
 api = Flask(__name__)
 api.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
@@ -15,7 +15,7 @@ db = mysql.connector.connect(
 )
 
 
-@api.before_first_request
+@api.before_request
 def _run_on_start():
     cursor = db.cursor(dictionary=True)
     cursor.execute('''
@@ -42,14 +42,10 @@ def _run_on_start():
     CCsDemanda = cursor.fetchall()
     
     df_demandas = transformarBancoToDataFrame(demandas, usuarios, beneficios, CCs, CCsDemanda)
-    df_dados_finais = transformarDataFrameToVetorizada(df_demandas) 
-    
-    session['df_demandas'] = df_dados_finais.to_dict('records')
-    
-    print("---------- DataFrame de demandas feito -----------")
+    session['df_demandas'] = df_demandas.to_dict('records')
 
     
-def pegarDFDemandas():
+def getDFDemandas():
     json_demandas = session.get('df_demandas')
     df_demandas = pd.DataFrame.from_dict(json_demandas)
     
@@ -58,25 +54,27 @@ def pegarDFDemandas():
 
 @api.route('/', methods = ['GET'])
 def checar():
-    df_demandas = pegarDFDemandas()
+    df_demandas = getDFDemandas()
     return df_demandas.to_json(orient='records')
 
 
 @api.route('/checar', methods=['POST'])
 def check():
-    print("aaaaaaaaaaa")
-    print(request.data)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute('''
+        SELECT 
+        usuario.dtype, usuario.id_usuario, usuario.cargo, usuario.departamento, usuario.nome_usuario, usuario.numero_cadastro, usuario.setor 
+        FROM sade.usuario
+    ''')
+    usuarios = cursor.fetchall()
     
-    json_demanda_nova = request.data
-    demanda_nova = json.loads(json_demanda_nova) # dicionário
+    cursor.execute('''SELECT * FROM sade.centro_custo''')
+    CCs = cursor.fetchall()
     
-    print(demanda_nova)
+    demanda_nova = json.loads(request.data)
+    id_demandas_similares = checarSimilaridade(getDFDemandas(), demanda_nova, pd.DataFrame(usuarios), pd.DataFrame(CCs))
     
-    return "Tudo certo"
-
-
-
-
+    return id_demandas_similares
 
 
 if __name__ == '__main__':
