@@ -1,16 +1,11 @@
-# pip install flask
-# pip install flask-mysqldb !!!o de baixo é melhor
-# pip install mysql-connector-python
-# flask doc: https://flask.palletsprojects.com/en/2.3.x/
-# endpoint criado: http://localhost:5000
-# pra rodar só ir no cmd onde está esse arquivo ,py e dá um 'python api_endpoint.py'
-
-from flask import Flask, json, render_template, request
+from flask import Flask, json, render_template, request, session
 import mysql.connector
 import json
-
+import pandas as pd
+from utils import transformarBancoToDataFrame, transformarDataFrameToVetorizada, adicionarNovaLinha
 
 api = Flask(__name__)
+api.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 db = mysql.connector.connect(
     host='127.0.0.1',   
     user='root',
@@ -20,33 +15,68 @@ db = mysql.connector.connect(
 )
 
 
-@api.route('/usuarios', methods = ['GET'])
-def usuario():
+@api.before_first_request
+def _run_on_start():
     cursor = db.cursor(dictionary=True)
-    cursor.execute('''SELECT usuario.nome_usuario, usuario.email FROM sade.usuario''')
+    cursor.execute('''
+        SELECT 
+        demanda.id_demanda, demanda.frequencia_uso, demanda.objetivo, demanda.situacao_atual, demanda.titulo_demanda, demanda.id_usuario 
+        FROM sade.demanda
+    ''')
+    demandas = cursor.fetchall()
+    
+    cursor.execute('''
+        SELECT 
+        usuario.dtype, usuario.id_usuario, usuario.cargo, usuario.departamento, usuario.nome_usuario, usuario.numero_cadastro, usuario.setor 
+        FROM sade.usuario
+    ''')
     usuarios = cursor.fetchall()
-
-    return json.dumps(usuarios)
+    
+    cursor.execute('''SELECT * FROM sade.beneficio''')
+    beneficios = cursor.fetchall()
+    
+    cursor.execute('''SELECT * FROM sade.centro_custo''')
+    CCs = cursor.fetchall()
+    
+    cursor.execute('''SELECT * FROM sade.centro_custo_demanda''')
+    CCsDemanda = cursor.fetchall()
+    
+    df_demandas = transformarBancoToDataFrame(demandas, usuarios, beneficios, CCs, CCsDemanda)
+    df_dados_finais = transformarDataFrameToVetorizada(df_demandas) 
+    
+    session['df_demandas'] = df_dados_finais.to_dict('records')
+    
+    print("---------- DataFrame de demandas feito -----------")
 
     
-# @api.route('/login', methods = ['POST', 'GET'])
-# def login():
-#     if request.method == 'GET':
-#         return "Login via the login Form"
-     
-#     if request.method == 'POST':
-#         # name = request.form['name']
-#         # age = request.form['age']
-#         # cursor = mysql.connection.cursor()
-#         # cursor.execute(''' INSERT INTO info_table VALUES(%s,%s)''',(name,age))
-#         # mysql.connection.commit()
-#         # cursor.close()
-#         return f"Done!!"
-
+def pegarDFDemandas():
+    json_demandas = session.get('df_demandas')
+    df_demandas = pd.DataFrame.from_dict(json_demandas)
     
-@api.route('/', methods=['GET'])
-def initial():
-  return "Você está no server!"
+    return df_demandas
+
+
+@api.route('/', methods = ['GET'])
+def checar():
+    df_demandas = pegarDFDemandas()
+    return df_demandas.to_json(orient='records')
+
+
+@api.route('/checar', methods=['POST'])
+def check():
+    print("aaaaaaaaaaa")
+    print(request.data)
+    
+    json_demanda_nova = request.data
+    demanda_nova = json.loads(json_demanda_nova) # dicionário
+    
+    print(demanda_nova)
+    
+    return "Tudo certo"
+
+
+
+
 
 
 if __name__ == '__main__':
