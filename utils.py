@@ -272,15 +272,14 @@ def checarSimilaridade(df_demanda, demanda_nova, usuarios_atualizados, CCs_atual
     df_todas_vetorizadas = transformarDataFrameToVetorizada(df_todas_demandas)
 
     similarity = cosine_similarity(df_todas_vetorizadas.drop("id_demanda", axis=1))
-    indice_similaridade = 0.75 # mudar isso aqui para ver como funcionaria no caso real (0.65)
+    indice_similaridade = 0.65 
     valores_similaridade_ultima_demanda = similarity[-1]
     id_demandas_similares = []
 
     for i in range(len(valores_similaridade_ultima_demanda)):
         valor = valores_similaridade_ultima_demanda[i]
-        if valor > indice_similaridade and valor < 0.999999999999999:
+        if valor > indice_similaridade and i != len(valores_similaridade_ultima_demanda) - 1:
             id_demandas_similares.append(int(df_todas_vetorizadas.iloc[i]["id_demanda"]))
     
  
-
     return id_demandas_similares
