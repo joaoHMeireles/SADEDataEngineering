@@ -2,6 +2,12 @@ import pandas as pd
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer
+
+nltk.download('stopwords')
 
 
 def converter_valor(valor_puro, moeda):
@@ -136,12 +142,17 @@ def transformarBancoToDataFrame(demandas, usuarios, beneficios, CCs, CCsDemanda)
     
     return df_demandas_transformadas
 
-
 def adicionarNovaColuna(df_alvo, nome_coluna, df_info):
-    X = df_info[nome_coluna].values.astype('U')
+    stemmer = PorterStemmer()
+    stop_words = set(stopwords.words('portuguese'))
+    
+    palavras = df_info[nome_coluna].values.astype('U').tolist()
+    palavras = [palavra.lower() for palavra in palavras]
+    palavras = [palavra for palavra in palavras if palavra not in stop_words]
+    palavras = [stemmer.stem(palavra) for palavra in palavras]
 
-    cvec = CountVectorizer().fit(X)
-    df_coluna = pd.DataFrame(cvec.transform(X).todense(), columns=cvec.get_feature_names_out())
+    cvec = CountVectorizer().fit(palavras)
+    df_coluna = pd.DataFrame(cvec.transform(palavras).todense(), columns=cvec.get_feature_names_out())
     
     return df_coluna
 
@@ -261,15 +272,14 @@ def checarSimilaridade(df_demanda, demanda_nova, usuarios_atualizados, CCs_atual
     df_todas_vetorizadas = transformarDataFrameToVetorizada(df_todas_demandas)
 
     similarity = cosine_similarity(df_todas_vetorizadas.drop("id_demanda", axis=1))
-    indice_similaridade = 0.70
+    indice_similaridade = 0.65 
     valores_similaridade_ultima_demanda = similarity[-1]
     id_demandas_similares = []
 
     for i in range(len(valores_similaridade_ultima_demanda)):
         valor = valores_similaridade_ultima_demanda[i]
-        if valor > indice_similaridade and valor < 0.999999999999999:
+        if valor > indice_similaridade and i != len(valores_similaridade_ultima_demanda) - 1:
             id_demandas_similares.append(int(df_todas_vetorizadas.iloc[i]["id_demanda"]))
     
  
-
     return id_demandas_similares
