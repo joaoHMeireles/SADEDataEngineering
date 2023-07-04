@@ -275,6 +275,8 @@ def checarSimilaridade(df_demanda, demanda_nova, usuarios_atualizados, CCs_atual
     indice_similaridade = 0.65 
     valores_similaridade_ultima_demanda = similarity[-1]
     id_demandas_similares = []
+    
+    print(valores_similaridade_ultima_demanda)
 
     for i in range(len(valores_similaridade_ultima_demanda)):
         valor = valores_similaridade_ultima_demanda[i]
