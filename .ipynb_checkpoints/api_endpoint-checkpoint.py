@@ -1,10 +1,15 @@
-from flask import Flask, json, render_template, request, session
+from flask import Flask, render_template, request, session
+from flask_session import Session
 import mysql.connector
 import json
 import pandas as pd
 from utils import transformarBancoToDataFrame, transformarDataFrameToVetorizada, checarSimilaridade
 
 api = Flask(__name__)
+SESSION_TYPE = 'filesystem'
+api.config.from_object(__name__)
+Session(api)
+
 api.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 db = mysql.connector.connect(
     host='127.0.0.1',   
@@ -17,6 +22,7 @@ db = mysql.connector.connect(
 
 @api.before_request
 def _run_on_start():
+    print("- - - - - - FEZ AS REQUISIÇÕES PARA O BANCO - - - - - -")
     cursor = db.cursor(dictionary=True)
     cursor.execute('''
         SELECT 
@@ -43,11 +49,15 @@ def _run_on_start():
     
     df_demandas = transformarBancoToDataFrame(demandas, usuarios, beneficios, CCs, CCsDemanda)
     session['df_demandas'] = df_demandas.to_dict('records')
+    
+    print("- - - - - - COLOCOU NA SESSÃO - - - - - -")
 
     
 def getDFDemandas():
     json_demandas = session.get('df_demandas')
     df_demandas = pd.DataFrame.from_dict(json_demandas)
+    
+    print("- - - - - - PEGOU A DEMANDA DA SESSION - - - - - -")
     
     return df_demandas
 

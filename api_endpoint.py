@@ -1,10 +1,15 @@
-from flask import Flask, json, render_template, request, session
+from flask import Flask, render_template, request, session
+from flask_session import Session
 import mysql.connector
 import json
 import pandas as pd
 from utils import transformarBancoToDataFrame, transformarDataFrameToVetorizada, checarSimilaridade
 
 api = Flask(__name__)
+SESSION_TYPE = 'filesystem'
+api.config.from_object(__name__)
+Session(api)
+
 api.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 db = mysql.connector.connect(
     host='127.0.0.1',   
@@ -17,6 +22,7 @@ db = mysql.connector.connect(
 
 @api.before_request
 def _run_on_start():
+    db.reconnect()
     cursor = db.cursor(dictionary=True)
     cursor.execute('''
         SELECT 
@@ -40,6 +46,7 @@ def _run_on_start():
     
     cursor.execute('''SELECT * FROM sade.centro_custo_demanda''')
     CCsDemanda = cursor.fetchall()
+    cursor.close()
     
     df_demandas = transformarBancoToDataFrame(demandas, usuarios, beneficios, CCs, CCsDemanda)
     session['df_demandas'] = df_demandas.to_dict('records')
@@ -48,7 +55,7 @@ def _run_on_start():
 def getDFDemandas():
     json_demandas = session.get('df_demandas')
     df_demandas = pd.DataFrame.from_dict(json_demandas)
-    
+
     return df_demandas
 
 
@@ -60,6 +67,7 @@ def checar():
 
 @api.route('/checar', methods=['POST'])
 def check():
+    db.reconnect()
     cursor = db.cursor(dictionary=True)
     cursor.execute('''
         SELECT 
@@ -70,6 +78,7 @@ def check():
     
     cursor.execute('''SELECT * FROM sade.centro_custo''')
     CCs = cursor.fetchall()
+    cursor.close()
     
     demanda_nova = json.loads(request.data)
     id_demandas_similares = checarSimilaridade(getDFDemandas(), demanda_nova, pd.DataFrame(usuarios), pd.DataFrame(CCs))
